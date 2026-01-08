@@ -8,12 +8,6 @@ from omegaconf import OmegaConf
 from PIL import Image
 from transformers import AutoTokenizer
 
-current_file_path = os.path.abspath(__file__)
-project_roots = [os.path.dirname(current_file_path), os.path.dirname(os.path.dirname(current_file_path)), os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))]
-for project_root in project_roots:
-    sys.path.insert(0, project_root) if project_root not in sys.path else None
-
-from videox_fun.dist import set_multi_gpus_devices, shard_model
 from videox_fun.models import (AutoencoderKLWan, CLIPModel, WanT5EncoderModel,
                               WanTransformer3DModel)
 from videox_fun.models.cache_utils import get_teacache_coefficients
@@ -40,12 +34,8 @@ from videox_fun.utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 # sequential_cpu_offload means that each layer of the model will be moved to the CPU after use, 
 # resulting in slower speeds but saving a large amount of GPU memory.
 GPU_memory_mode     = "sequential_cpu_offload"
-# Multi GPUs config
-# Please ensure that the product of ulysses_degree and ring_degree equals the number of GPUs used. 
-# For example, if you are using 8 GPUs, you can set ulysses_degree = 2 and ring_degree = 4.
-# If you are using 1 GPU, you can set ulysses_degree = 1 and ring_degree = 1.
-ulysses_degree      = 1
-ring_degree         = 1
+
+
 # Use FSDP to save more GPU memory in multi gpus.
 fsdp_dit            = False
 fsdp_text_encoder   = True
@@ -136,7 +126,7 @@ num_inference_steps = 20
 lora_weight         = 0.55
 save_path           = "samples/wan-videos-fun-i2v"
 
-device = set_multi_gpus_devices(ulysses_degree, ring_degree)
+device = 'cuda:0'
 config = OmegaConf.load(config_path)
 
 transformer = WanTransformer3DModel.from_pretrained(
@@ -217,17 +207,7 @@ pipeline = WanFunInpaintPipeline(
     scheduler=scheduler,
     clip_image_encoder=clip_image_encoder
 )
-if ulysses_degree > 1 or ring_degree > 1:
-    from functools import partial
-    transformer.enable_multi_gpus_inference()
-    if fsdp_dit:
-        shard_fn = partial(shard_model, device_id=device, param_dtype=weight_dtype)
-        pipeline.transformer = shard_fn(pipeline.transformer)
-        print("Add FSDP DIT")
-    if fsdp_text_encoder:
-        shard_fn = partial(shard_model, device_id=device, param_dtype=weight_dtype)
-        pipeline.text_encoder = shard_fn(pipeline.text_encoder)
-        print("Add FSDP TEXT ENCODER")
+
 
 if compile_dit:
     for i in range(len(pipeline.transformer.blocks)):
@@ -313,9 +293,4 @@ def save_results():
         video_path = os.path.join(save_path, prefix + ".mp4")
         save_videos_grid(sample, video_path, fps=fps)
 
-if ulysses_degree * ring_degree > 1:
-    import torch.distributed as dist
-    if dist.get_rank() == 0:
-        save_results()
-else:
-    save_results()
+save_results()
