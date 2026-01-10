@@ -63,7 +63,7 @@ def save_videos_grid(videos: torch.Tensor, path: str, rescale=False, n_rows=6, f
         x = torchvision.utils.make_grid(x, nrow=n_rows)
         x = x.transpose(0, 1).transpose(1, 2).squeeze(-1)
         if rescale:
-            x = (x + 1.0) / 2.0  # -1,1 -> 0,1
+            x = (x + 1) / 2.0  # -1,1 -> 0,1
         x = (x * 255).numpy().astype(np.uint8)
         outputs.append(Image.fromarray(x))
 
@@ -219,11 +219,14 @@ def get_image_to_video_latent(validation_image_start, validation_image_end, vide
             input_video_mask = torch.zeros_like(input_video[:, :1])
             input_video_mask[:, :, len(image_start):] = 255
         else:
+            # [1,c,t,h,w]
             input_video = torch.tile(
                 torch.from_numpy(np.array(image_start)).permute(2, 0, 1).unsqueeze(1).unsqueeze(0), 
                 [1, 1, video_length, 1, 1]
             ) / 255
+            # [1,1,t,h,w]
             input_video_mask = torch.zeros_like(input_video[:, :1])
+            # 第一帧之后都是mask
             input_video_mask[:, :, 1:, ] = 255
     else:
         image_start = None

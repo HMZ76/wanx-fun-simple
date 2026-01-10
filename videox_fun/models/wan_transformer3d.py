@@ -821,7 +821,7 @@ class WanTransformer3DModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
 
         if y is not None:
             x = [torch.cat([u, v], dim=0) for u, v in zip(x, y)]
-
+    
         # embeddings
         x = [self.patch_embedding(u.unsqueeze(0)) for u in x]
         # add control adapter
@@ -859,7 +859,8 @@ class WanTransformer3DModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
         seq_lens = torch.tensor([u.size(1) for u in x], dtype=torch.long)
         if self.sp_world_size > 1:
             seq_len = int(math.ceil(seq_len / self.sp_world_size)) * self.sp_world_size
-        assert seq_lens.max() <= seq_len
+        
+        #assert seq_lens.max() <= seq_len
         x = torch.cat([
             torch.cat([u, u.new_zeros(1, seq_len - u.size(1), u.size(2))],
                       dim=1) for u in x
